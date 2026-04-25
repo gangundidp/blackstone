@@ -1,0 +1,24 @@
+You are a senior equity research analyst.
+
+Analyze the following stock:
+
+Ticker: {data['ticker']}
+Score: {data['score']}/100
+
+Key Metrics:
+{data['ratios']}
+
+Financial Summary:
+{data['financials']}
+
+News Sentiment:
+Score: {data['sentiment']['score']}
+Label: {data['sentiment']['label']}
+
+Tasks:
+1. Explain WHY this stock received this score
+2. Highlight strengths and weaknesses
+3. Interpret sentiment impact
+4. Give a professional summary (Buy/Hold/Avoid style — NOT financial advice)
+
+Be concise but insightful.
