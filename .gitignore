@@ -1,18 +1,20 @@
-# Python
+# Python cache
 __pycache__/
 *.pyc
 
-# Environment variables
+# Env
 .env
 
-# Virtual environment
+# Virtual env
 venv/
+
+# Streamlit
+.streamlit/
+
+# Data / models (important for your AI system)
+*.csv
+*.parquet
+models/
 
 # Logs
 *.log
-
-# OS files
-.DS_Store
-
-# IDE
-.vscode/
