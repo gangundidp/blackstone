@@ -3,7 +3,7 @@ import requests
 
 st.title("📈 AI Stock Analyzer")
 
-symbol = st.text_input("Enter Stock Symbol", "AAPL")
+symbol = st.text_input("Enter Stock Symbol", "TCS")
 
 def sentiment_color(sentiment):
     if sentiment == "positive":
@@ -20,7 +20,8 @@ if st.button("Analyze"):
             st.write(response.json())
             st.error(f"Error: {response.json().get('detail')}")
             st.stop()
-            
+        
+        # st.write_stream(response)    
         st.session_state["result"] = response.json()
         
     except Exception as e:
@@ -39,17 +40,18 @@ if result:
         
     if st.checkbox("Show raw API response"):
         st.write(result)
+        
             
     st.subheader("📊 Key Metrics")
     st.metric("Price", data.get("price", "N/A"))
-    st.metric("PE Ratio", data.get("pe", "N/A"))
+    st.metric("PE Ratio", data.get("pe_ratio", "N/A"))
     st.metric("ROE", data.get("roe", "N/A"))
     st.metric("Debt/Equity", data.get("de_ratio", "N/A"))
 
     st.subheader("📈 Analysis")
     st.write(f"Score: {analysis['score']}")
-    st.write(f"Rating: {analysis['rating']}")
-    st.write("Breakdown:", analysis["breakdown"])
+    st.write(f"Rating: {analysis['summary']}")
+    st.write("Factors:", analysis["factors"])
         
     st.subheader("📊 AI Analyst Verdict")
     st.write(result["explanation"])
@@ -74,8 +76,7 @@ if result:
 
     for article in news["articles"]:
         st.markdown(f"**{article['title']}**")
-        st.markdown(f"Sentiment: <span style='color:{sentiment_color(article['sentiment'])}'>{article['sentiment']}</span>",
-    unsafe_allow_html=True)
+        st.markdown(f"Sentiment: <span style='color:{sentiment_color(article['sentiment'])}'>{article['sentiment']}</span>", unsafe_allow_html=True)
         st.markdown(f"[Read more]({article['link']})")
         st.write("---")
 

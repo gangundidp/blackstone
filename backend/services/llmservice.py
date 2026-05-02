@@ -1,60 +1,50 @@
-import os
-from openai import OpenAI
-from dotenv import load_dotenv
-import os
+from backend.llm.llm_router import generate_response_async, stream_response
+import json
 
-# loads .env file
-load_dotenv()
+def clean_data(data: dict) -> str:
+    return json.dumps(data, default=str, indent=2)
 
-api_key = os.getenv("OPENAI_API_KEY")
+# Async full response
+async def generate_explanation(data: dict) -> str:
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-def generate_explanation(data):
-    """
-    data = {
-        "ticker": "AAPL",
-        "score": 78,
-        "financials": {...},
-        "ratios": {...},
-        "sentiment": {...}
-    }
-    """
+    score = data.get("analysis", {}).get("score", 0)
+    score_100 = round(score * 20, 2)
 
     prompt = f"""
 You are a senior equity research analyst.
 
-Analyze the following stock:
-
 Ticker: {data['ticker']}
-Score: {data['analysis']['score']}/100
+Score: {score}/100
 
 Key Metrics:
-{data['ratios']}
+{clean_data(data['ratios'])}
 
 Financial Summary:
-{data['financials']}
+{clean_data(data['financials'])}
 
 News Sentiment:
-Score: {data['sentiment']['score']}
-Label: {data['sentiment']['label']}
+Score: {clean_data(data['sentiment']['score'])}
+Label: {clean_data(data['sentiment']['label'])}
 
-Tasks:
-1. Explain WHY this stock received this score
-2. Highlight strengths and weaknesses
-3. Interpret sentiment impact
-4. Give a professional summary (Buy/Hold/Avoid style — NOT financial advice)
-
-Be concise but insightful.
+Return structured analysis.
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",  # cost-efficient
-        messages=[
-            {"role": "system", "content": "You are a professional stock analyst."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0.4
-    )
+    return await generate_response_async(prompt)
 
-    return response.choices[0].message.content
+
+# Streaming version
+async def stream_explanation(data: dict):
+
+    score = data.get("analysis", {}).get("score", "N/A")
+
+    prompt = f"""
+You are a senior equity research analyst.
+
+Ticker: {data['ticker']}
+Score: {score}/100
+
+Provide live analysis as it is generated.
+"""
+
+    async for chunk in stream_response(prompt):
+        yield chunk

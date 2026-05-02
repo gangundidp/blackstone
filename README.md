@@ -13,7 +13,8 @@ blackStone/
 │   ├── agents/              # Automation agents
 │   ├── analysis/            # Financial calculations
 │   ├── rag/                 # Retrieval system
-│
+│   │── main.py
+|
 ├── data_engine/             # Data collection
 │   ├── collectors/          # APIs (yfinance etc.)
 │   ├── scrapers/            # web scraping
@@ -27,5 +28,3 @@ blackStone/
 │   ├── settings.py
 │
 ├── utils/
-│
-└── main.py
