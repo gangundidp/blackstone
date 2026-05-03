@@ -10,10 +10,16 @@ async def generate_local_async(prompt: str) -> str:
         async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 OLLAMA_URL,
-                json={
+                json= {
                     "model": settings.OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "stream": False
+                    "prompt": prompt[:3000],
+                    "stream": False,
+                    "options": {
+                        # "num_predict": 150,
+                        "temperature": 0.2,
+                        "top_p": 0.9,
+                        # "num_ctx": 2048
+                    },
                 }
             )
 

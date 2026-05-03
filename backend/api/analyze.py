@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse 
 from utils.logger import logger
+import asyncio
 from backend.services.dataservice import fetch_complete_stock_data
 from backend.analysis.fundamentalanalysis import analyze_fundamentals
 # from backend.agents.explanationagent import generate_explanation
@@ -20,6 +21,7 @@ async def llm_health():
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
+
 @router.get("/analyze/{symbol}")
 async def analyze_stock(symbol: str):
     try:
@@ -34,45 +36,24 @@ async def analyze_stock(symbol: str):
         logger.info(f"Analyzing stock: {symbol}")
         logger.info(f"Fetched data: {data}")
         
-        analysis = analyze_fundamentals(data)
+        analysis_task = asyncio.to_thread(analyze_fundamentals, data)
+        news_task = asyncio.to_thread(get_news_with_sentiment, symbol)
+
+        analysis, news_data = await asyncio.gather(
+        analysis_task,
+        news_task
+        )
+
         logger.info(f"Analysis: {analysis}")
-        # explanation = generate_explanation(data, analysis)
-        
-        news_data = get_news_with_sentiment(symbol)
-
         sentiment = analyze_sentiment(news_data["articles"])
-
-        try:
-            explanation = await generate_explanation({
-                "ticker": symbol,
-                "analysis": analysis,
-                "financials": data,
-                "ratios": {
-                    "pe": data.get("pe"),
-                    "roe": data.get("roe"),
-                    "de_ratio": data.get("de_ratio")
-                },
-                "sentiment": sentiment
-            })
-        except Exception as e:
-            explanation = f"""
-LLM unavailable.
-
-Quick Summary:
-- Rating: {analysis.get('rating')}
-- Score: {analysis.get('score')}
-- Sentiment: {sentiment.get('label')}
-
-This stock shows {'strong' if analysis.get('score',0) > 70 else 'moderate'} fundamentals.
-"""        
+        
+        logger.info(f"Sentiment: {sentiment}")
 
         return {
             "data": data,
             "ticker": symbol,
             "analysis": analysis,
-            "sentiment": sentiment,
-            "explanation": explanation,
-            "news": news_data
+            "sentiment": sentiment
         }
             
         
@@ -82,26 +63,74 @@ This stock shows {'strong' if analysis.get('score',0) > 70 else 'moderate'} fund
         }
         
         
+
 @router.get("/analyze-stream/{symbol}")
-async def analyze_stock_stream(symbol: str):
+async def analyze_stock_stream(symbol: str, request: Request):
 
-    data = fetch_complete_stock_data(symbol)
-    analysis = analyze_fundamentals(data)
-    news_data = get_news_with_sentiment(symbol)
-    sentiment = analyze_sentiment(news_data["articles"])
+    # -----------------------------
+    # 1. SAFE DATA FETCH
+    # -----------------------------
+    try:
+        data = fetch_complete_stock_data(symbol)
 
+        if not data or data.get("price") is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid or unavailable stock data for symbol: {symbol}"
+            )
+
+        analysis = analyze_fundamentals(data)
+
+        news_data = get_news_with_sentiment(symbol)
+        sentiment = analyze_sentiment(news_data["articles"])
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Data processing failed: {str(e)}"
+        )
+
+    # -----------------------------
+    # 2. STREAM GENERATOR (SAFE)
+    # -----------------------------
     async def generator():
-        async for chunk in stream_explanation({
-            "ticker": symbol,
-            "analysis": analysis,
-            "financials": data,
-            "ratios": {
-                "pe": data.get("pe"),
-                "roe": data.get("roe"),
-                "de_ratio": data.get("de_ratio")
-            },
-            "sentiment": sentiment
-        }):
-            yield chunk
+        try:
+            async for chunk in stream_explanation({
+                "ticker": symbol,
+                "analysis": analysis,
+                "financials": data,
+                "ratios": {
+                    "pe": data.get("pe_ratio"),
+                    "roe": data.get("roe"),
+                    "de_ratio": data.get("de_ratio")
+                },
+                "sentiment": sentiment
+            }):
 
-    return StreamingResponse(generator(), media_type="text/plain")
+                if await request.is_disconnected():
+                    print("Client disconnected")
+                    break
+
+                yield chunk
+
+                # small async yield to event loop
+                await asyncio.sleep(0)
+
+        except Exception as e:
+            error_msg = f"\n\n[ERROR] LLM streaming failed: {str(e)}\n"
+            yield error_msg
+
+    # -----------------------------
+    # 3. RETURN STREAM
+    # -----------------------------
+    return StreamingResponse(
+        generator(),
+        media_type="text/plain"
+    )
+@router.get("/news/{symbol}")
+def get_news(symbol: str):
+    news_data = get_news_with_sentiment(symbol)
+    return news_data

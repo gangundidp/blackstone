@@ -14,7 +14,7 @@ async def generate_explanation(data: dict) -> str:
 You are a senior equity research analyst.
 
 Ticker: {data['ticker']}
-Score: {score}/100
+Score: {score_100}/100
 
 Key Metrics:
 {clean_data(data['ratios'])}
@@ -35,15 +35,26 @@ Return structured analysis.
 # Streaming version
 async def stream_explanation(data: dict):
 
-    score = data.get("analysis", {}).get("score", "N/A")
+    score = data.get("analysis", {}).get("score", 0)
+    score_100 = round(score * 20, 2)
 
     prompt = f"""
 You are a senior equity research analyst.
 
 Ticker: {data['ticker']}
-Score: {score}/100
+Score: {score_100}/100
 
-Provide live analysis as it is generated.
+Key Metrics:
+{clean_data(data['ratios'])}
+
+Financial Summary:
+{clean_data(data['financials'])}
+
+News Sentiment:
+Score: {clean_data(data['sentiment']['score'])}
+Label: {clean_data(data['sentiment']['label'])}
+
+Return structured analysis.
 """
 
     async for chunk in stream_response(prompt):

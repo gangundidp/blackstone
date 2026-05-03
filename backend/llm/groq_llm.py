@@ -12,8 +12,8 @@ async def generate_groq_async(prompt: str) -> str:
                 {"role": "user", "content": prompt}
             ],
             model=settings.GROQ_MODEL,
-            temperature=0.4,
-            max_tokens=800  # IMPORTANT
+            temperature=0.2,
+            max_tokens=200  # IMPORTANT
         )
 
         return response.choices[0].message.content.strip()
