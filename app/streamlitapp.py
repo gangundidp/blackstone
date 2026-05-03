@@ -1,9 +1,28 @@
 import streamlit as st
 import requests
-
+    
+with st.sidebar:
+    if st.button("Check LLM Health"):
+        try:
+            res = requests.get("http://localhost:8000/api/v1/llm-health", timeout=10)
+            st.success("LLM is healthy" if res.status_code == 200 else "LLM issue")
+        except:
+            st.error("LLM not reachable")
+            
+def stream_from_api(url):
+    with requests.get(url, stream=True) as r:
+        for chunk in r.iter_content(chunk_size=1024):
+            if chunk:
+                yield chunk.decode("utf-8")
+                
 st.title("📈 AI Stock Analyzer")
 
 symbol = st.text_input("Enter Stock Symbol", "TCS")
+
+if st.button("Analyze (Streaming)"):
+    url = f"http://127.0.0.1:8000/api/v1/analyze-stream/{symbol}"
+
+    st.write_stream(stream_from_api(url))
 
 def sentiment_color(sentiment):
     if sentiment == "positive":

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse 
 from utils.logger import logger
+import asyncio
 from backend.services.dataservice import fetch_complete_stock_data
 from backend.analysis.fundamentalanalysis import analyze_fundamentals
 # from backend.agents.explanationagent import generate_explanation
@@ -20,6 +21,7 @@ async def llm_health():
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
+
 @router.get("/analyze/{symbol}")
 async def analyze_stock(symbol: str):
     try:
@@ -34,21 +36,25 @@ async def analyze_stock(symbol: str):
         logger.info(f"Analyzing stock: {symbol}")
         logger.info(f"Fetched data: {data}")
         
-        analysis = analyze_fundamentals(data)
+        analysis_task = asyncio.to_thread(analyze_fundamentals, data)
+        news_task = asyncio.to_thread(get_news_with_sentiment, symbol)
+
+        analysis, news_data = await asyncio.gather(
+        analysis_task,
+        news_task
+        )
+
         logger.info(f"Analysis: {analysis}")
-        # explanation = generate_explanation(data, analysis)
-        
-        news_data = get_news_with_sentiment(symbol)
-
         sentiment = analyze_sentiment(news_data["articles"])
-
+        
+        logger.info(f"Sentiment: {sentiment}")
         try:
             explanation = await generate_explanation({
                 "ticker": symbol,
                 "analysis": analysis,
                 "financials": data,
                 "ratios": {
-                    "pe": data.get("pe"),
+                    "pe": data.get("pe_ratio"),
                     "roe": data.get("roe"),
                     "de_ratio": data.get("de_ratio")
                 },
@@ -96,7 +102,7 @@ async def analyze_stock_stream(symbol: str):
             "analysis": analysis,
             "financials": data,
             "ratios": {
-                "pe": data.get("pe"),
+                "pe": data.get("pe_ratio"),
                 "roe": data.get("roe"),
                 "de_ratio": data.get("de_ratio")
             },
