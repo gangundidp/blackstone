@@ -1,3 +1,12 @@
+from functools import lru_cache
+
+from backend.services.data_aggregator import DataAggregator
+from backend.services.normalizer import Normalizer
+
+aggregator = DataAggregator()
+normalizer = Normalizer()
+
+
 def safe_float(value):
     try:
         return float(value)
@@ -5,19 +14,20 @@ def safe_float(value):
         return None
 
 
-from backend.dataproviders.yahoofinance import get_stock_data
-from functools import lru_cache
-
 @lru_cache(maxsize=100)
-def fetch_complete_stock_data(symbol: str):
-    raw = get_stock_data(symbol)
+def fetch_complete_stock_data(symbol: str, region: str = "IN"):
+    """
+    Unified stock data fetcher (India-first architecture)
+    """
 
-    return {
-        "symbol": symbol,
-        "price": safe_float(raw.get("currentPrice")),
-        "pe": safe_float(raw.get("trailingPE")),
-        "roe": safe_float(raw.get("returnOnEquity")),
-        "de_ratio": safe_float(raw.get("debtToEquity")),
-        "revenue_growth": safe_float(raw.get("revenueGrowth")),
-        "profit_margin": safe_float(raw.get("profitMargins")),
-    }
+    # STEP 1: Fetch from multiple sources
+    raw_data = aggregator.fetch_all(symbol, region)
+
+    # STEP 2: Normalize
+    normalized = normalizer.normalize(raw_data, symbol, region)
+
+    # STEP 3: Validation
+    if not normalized.get("price"):
+        raise ValueError(f"Invalid or unavailable stock data for symbol: {symbol}")
+
+    return normalized
